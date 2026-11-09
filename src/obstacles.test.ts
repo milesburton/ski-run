@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createCourse, racingLineX } from './course';
-import { corridorHalfWidth, createObstacles, hitsObstacle } from './obstacles';
+import { corridorHalfWidth, createObstacles, hitsObstacle, pushOutOfObstacles } from './obstacles';
 import { createTerrain } from './terrain';
 import { OBSTACLES } from './tuning';
 import type { Obstacle } from './types';
@@ -54,5 +54,46 @@ describe('hitsObstacle', () => {
     expect(hitsObstacle(tree, vec(5.95, 1, 50))).toBe(false);
     expect(hitsObstacle(tree, vec(5, 6.5, 50))).toBe(false);
     expect(hitsObstacle(tree, vec(0, 1, 0))).toBe(false);
+  });
+});
+
+describe('pushOutOfObstacles', () => {
+  const terrain = createTerrain(1);
+  const rock = (x: number, z: number): Obstacle => ({
+    kind: 'rock',
+    x,
+    z,
+    baseY: terrain.heightAt(x, z),
+    radius: 1,
+    height: 50,
+  });
+
+  it('leaves a clear position on the ground where it was', () => {
+    const p = vec(10, 0, 10);
+    expect(pushOutOfObstacles([rock(0, 0)], p, terrain)).toEqual({
+      ...p,
+      y: terrain.heightAt(10, 10),
+    });
+  });
+
+  it('pushes radially clear of an overlapping obstacle', () => {
+    const o = rock(0, 0);
+    const out = pushOutOfObstacles([o], vec(0.5, terrain.heightAt(0.5, 0), 0), terrain);
+    expect(hitsObstacle(o, out)).toBe(false);
+    expect(out.z).toBeCloseTo(0);
+    expect(out.x).toBeGreaterThan(1);
+  });
+
+  it('handles the dead centre by going uphill', () => {
+    const o = rock(0, 0);
+    const out = pushOutOfObstacles([o], vec(0, 0, 0), terrain);
+    expect(out.z).toBeLessThan(0);
+    expect(hitsObstacle(o, out)).toBe(false);
+  });
+
+  it('clears two overlapping neighbours', () => {
+    const os = [rock(0, 0), rock(1.5, 0)];
+    const out = pushOutOfObstacles(os, vec(0.7, 0, 0), terrain);
+    expect(os.some((o) => hitsObstacle(o, out))).toBe(false);
   });
 });

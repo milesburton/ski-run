@@ -59,3 +59,37 @@ export const hitsObstacle = (
   const dz = pos.z - obstacle.z;
   return dx * dx + dz * dz < reach * reach && pos.y < obstacle.baseY + obstacle.height;
 };
+
+const PUSH_MARGIN = 0.25;
+
+/** Move `pos` radially out of one obstacle's reach (plus a margin), if it is inside. */
+const pushFrom = (obstacle: Obstacle, pos: Vec3, skierRadius: number): Vec3 => {
+  const reach = obstacle.radius + skierRadius;
+  const dx = pos.x - obstacle.x;
+  const dz = pos.z - obstacle.z;
+  const dist = Math.sqrt(dx * dx + dz * dz);
+  if (dist >= reach) return pos;
+  // Dead centre has no direction: choose uphill (-z) so the skier never jumps a gate.
+  const [ux, uz] = dist === 0 ? [0, -1] : [dx / dist, dz / dist];
+  const target = reach + PUSH_MARGIN;
+  return { x: obstacle.x + ux * target, y: pos.y, z: obstacle.z + uz * target };
+};
+
+/**
+ * Nudge a position out of every overlapping obstacle. Pushing out of one can land inside a
+ * neighbour, so repeat a bounded number of passes. Height follows the terrain.
+ */
+export const pushOutOfObstacles = (
+  obstacles: readonly Obstacle[],
+  pos: Vec3,
+  terrain: Terrain,
+  skierRadius: number = OBSTACLES.skierRadius,
+  passes = 8,
+): Vec3 => {
+  const pushed = obstacles.reduce((p, o) => pushFrom(o, p, skierRadius), pos);
+  const settled = { ...pushed, y: terrain.heightAt(pushed.x, pushed.z) };
+  const clear = !obstacles.some((o) => hitsObstacle(o, settled, skierRadius));
+  return clear || passes <= 1
+    ? settled
+    : pushOutOfObstacles(obstacles, settled, terrain, skierRadius, passes - 1);
+};

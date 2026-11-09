@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createCourse } from './course';
-import { createObstacles } from './obstacles';
+import { createObstacles, hitsObstacle } from './obstacles';
 import { totalTime } from './race';
 import { NEUTRAL_INPUT } from './skier';
 import { createSim, stepSim, type Sim, type World } from './sim';
@@ -67,5 +67,28 @@ describe('scripted bot on a short course', () => {
       { sim: createSim(world), seen: false },
     );
     expect(crashed.seen).toBe(true);
+  });
+
+  it('recovers clear of the obstacle and does not re-crash', () => {
+    const base = makeWorld(5);
+    const world: World = {
+      ...base,
+      obstacles: [
+        { kind: 'rock', x: 0, z: 5, baseY: base.terrain.heightAt(0, 5), radius: 2, height: 3 },
+      ],
+    };
+    const trace = Array.from({ length: 1200 }).reduce<{ sim: Sim; crashes: number }>(
+      (acc) => {
+        const sim = stepSim(world, acc.sim, NEUTRAL_INPUT, FIXED_DT);
+        return {
+          sim,
+          crashes: acc.crashes + (!acc.sim.skier.crashed && sim.skier.crashed ? 1 : 0),
+        };
+      },
+      { sim: createSim(world), crashes: 0 },
+    );
+    expect(trace.crashes).toBe(1);
+    expect(trace.sim.skier.crashed).toBe(false);
+    expect(world.obstacles.some((o) => hitsObstacle(o, trace.sim.skier.pos))).toBe(false);
   });
 });
