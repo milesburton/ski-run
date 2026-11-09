@@ -1,5 +1,7 @@
 # ski-run
 
+> **Work in progress. This is a toy project**, built for fun and to experiment. Expect missing features, rough edges and breaking changes. Not production software.
+
 Browser-only downhill ski game: timed gate course, procedural slope, deterministic fixed-step physics.
 TypeScript, Vite, three.js. Builds to a single `index.html` that works from `file://`.
 
