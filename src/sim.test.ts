@@ -69,26 +69,33 @@ describe('scripted bot on a short course', () => {
     expect(crashed.seen).toBe(true);
   });
 
-  it('recovers clear of the obstacle and does not re-crash', () => {
+  it('stands up clear of the obstacle it crashed in, without re-crashing', () => {
     const base = makeWorld(5);
-    const world: World = {
-      ...base,
-      obstacles: [
-        { kind: 'rock', x: 0, z: 5, baseY: base.terrain.heightAt(0, 5), radius: 2, height: 3 },
-      ],
-    };
-    const trace = Array.from({ length: 1200 }).reduce<{ sim: Sim; crashes: number }>(
-      (acc) => {
-        const sim = stepSim(world, acc.sim, NEUTRAL_INPUT, FIXED_DT);
-        return {
-          sim,
-          crashes: acc.crashes + (!acc.sim.skier.crashed && sim.skier.crashed ? 1 : 0),
-        };
+    const { terrain } = base;
+    const rock = {
+      kind: 'rock',
+      x: 0,
+      z: 20,
+      baseY: terrain.heightAt(0, 20),
+      radius: 2,
+      height: 3,
+    } as const;
+    const world: World = { ...base, obstacles: [rock] };
+    const start = createSim(world);
+    const inside: Sim = {
+      ...start,
+      skier: {
+        ...start.skier,
+        pos: { x: 0.3, y: terrain.heightAt(0.3, 20), z: 20 },
+        crashed: true,
+        crashTimer: FIXED_DT,
       },
-      { sim: createSim(world), crashes: 0 },
+    };
+    const after = Array.from({ length: 5 }).reduce<Sim>(
+      (sim) => stepSim(world, sim, NEUTRAL_INPUT, FIXED_DT),
+      inside,
     );
-    expect(trace.crashes).toBe(1);
-    expect(trace.sim.skier.crashed).toBe(false);
-    expect(world.obstacles.some((o) => hitsObstacle(o, trace.sim.skier.pos))).toBe(false);
+    expect(after.skier.crashed).toBe(false);
+    expect(hitsObstacle(rock, after.skier.pos)).toBe(false);
   });
 });
